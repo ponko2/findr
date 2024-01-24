@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use regex::Regex;
+use walkdir::WalkDir;
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -47,6 +48,13 @@ pub fn get_args() -> Result<Args> {
 }
 
 pub fn run(args: Args) -> Result<()> {
-    dbg!(args);
+    for path in args.paths {
+        for entry in WalkDir::new(path) {
+            match entry {
+                Err(err) => eprintln!("{err}"),
+                Ok(entry) => println!("{}", entry.path().display()),
+            }
+        }
+    }
     Ok(())
 }
