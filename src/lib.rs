@@ -1,7 +1,8 @@
+use crate::EntryType::*;
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use regex::Regex;
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -48,13 +49,32 @@ pub fn get_args() -> Result<Args> {
 }
 
 pub fn run(args: Args) -> Result<()> {
-    for path in args.paths {
-        for entry in WalkDir::new(path) {
-            match entry {
-                Err(err) => eprintln!("{err}"),
-                Ok(entry) => println!("{}", entry.path().display()),
+    let type_filter = |entry: &DirEntry| {
+        args.entry_types.is_empty()
+            || args.entry_types.iter().any(|entry_type| match entry_type {
+                Dir => entry.file_type().is_dir(),
+                File => entry.file_type().is_file(),
+                Link => entry.file_type().is_symlink(),
+            })
+    };
+    let name_filter = |entry: &DirEntry| {
+        args.names.is_empty()
+            || args
+                .names
+                .iter()
+                .any(|re| re.is_match(&entry.file_name().to_string_lossy()))
+    };
+    args.paths
+        .iter()
+        .flat_map(WalkDir::new)
+        .filter_map(|entry| {
+            if let Err(ref err) = entry {
+                eprintln!("{err}");
             }
-        }
-    }
+            entry.ok()
+        })
+        .filter(type_filter)
+        .filter(name_filter)
+        .for_each(|entry| println!("{}", entry.path().display()));
     Ok(())
 }
